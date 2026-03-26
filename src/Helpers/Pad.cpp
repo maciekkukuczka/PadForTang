@@ -10,8 +10,6 @@ bool Pad::Connected()
 
 void Pad::StartControllerRadar()
 {
-    //Włącza antene BT
-    Serial.println("Szukam pada od Xboksa...");
     xboxController.begin();
 }
 
