@@ -13,28 +13,33 @@ Text text(renderer);
 void setup()
 {
     Serial.begin(115200);
-    delay(500);
-    Serial.println("SETUP");
-    text.ShowText("SETUP");
     Wire.begin(20, 21);
-    delay(500);
+
     renderer.Setup();
-    delay(500);
-    text.ShowText("SETUP Ukonczony!");
+
+    Serial.println("Konfiguracja...");
+    text.ShowText("Konfiguracja...");
     renderer.Display();
-    delay(1000);
+    delay(800);
 
 #if USE_XBOX_PAD
-    pad.StartControllerRadar();
-    Serial.println("BT Właczony...");
-    text.ShowText("BT Właczony...");
-    delay(1000);
+    Serial.println("Inicjalizacja BT...");
+    text.ShowText("Inicjalizacja BT...", 0, 10, false);
+    renderer.Display();
 
-    Serial.println("START");
-    text.ShowText("START");
-    delay(1000);
+    pad.StartControllerRadar();
+
+    Serial.println("[ OK ]");
+    text.ShowText("[ OK ]", 100, 10, false);
+    renderer.Display();
+    delay(800);
 
 #endif
+
+    Serial.println("System GOTOWY!");
+    text.ShowText("System GOTOWY!",0, 20, false);
+    renderer.Display();
+    delay(1000);
 }
 
 void loop()
@@ -59,8 +64,8 @@ void loop()
         } */
     if (pad.Connected())
     {
-        Serial.println("Pad XBOX polaczony!");
-        text.ShowText("Pad XBOX polaczony!");
+        Serial.println("Pad POLACZONY!");
+        text.ShowText("Pad POLACZONY!");
 
         if (pad.UpPressed())
         {
@@ -89,8 +94,8 @@ void loop()
     }
     else
     {
-        Serial.println("Pad XBOX rozlaczony!");
-        text.ShowText("Pad XBOX rozlaczony!");
+        Serial.println("Pad ROZLACZONY!");
+        text.ShowText("Pad ROZLACZONY!");
     }
 #endif
 
