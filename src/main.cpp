@@ -11,52 +11,81 @@ Renderer renderer;
 Text text(renderer);
 
 // --- PINY KOMUNIKACYJNE TANG NANO ---
-const int PIN_CLOCK = 3;  // Pomarańczowy kabel - Zegar (od Tanga)
-const int PIN_LATCH = 4;  // Żółty kabel - Zatrzask (od Tanga)
-const int PIN_DATA  = 5;  // Ciemnozielony kabel - Dane (do Tanga)
+const int PIN_CLOCK = 3; // Pomarańczowy kabel - Zegar (od Tanga)
+const int PIN_LATCH = 4; // Żółty kabel - Zatrzask (od Tanga)
+const int PIN_DATA = 5;  // Ciemnozielony kabel - Dane (do Tanga)
 
-// --- NASZ WIRTUALNY REJESTR (Pamięć pada) ---
+/* // --- NASZ WIRTUALNY REJESTR (Pamięć pada) ---
 // uint8_t to specjalna zmienna, która ma dokładnie 8 bitów (8 miejsc na zera lub jedynki).
 // Idealnie pasuje do 8 przycisków klasycznego pada!
-// Wpisujemy na start 0xFF (same jedynki: 11111111), bo przypominam: 
-// w starych konsolach "1" = puszczony, "0" = wciśnięty.
+// Wpisujemy na start 0xFF (same jedynki: 11111111), bo przypominam:
+// w starych konsolach "1" = puszczony, "0" = wciśnięty. */
 volatile uint8_t nesRegister = 0xFF;
+volatile uint8_t bitIndex = 0; // Licznik wysłanych bitów (od 0 do 7)
+// volatile Mówi kompilatorowi: "Ej, ta zmienna będzie modyfikowana przez przerwania sprzętowe w tle, więc nie próbuj jej optymalizować!".
 
-// Słówko IRAM_ATTR jest KRYTYCZNE na ESP32!
+/* // Słówko IRAM_ATTR jest KRYTYCZNE na ESP32!
 // Mówi procesorowi: "Trzymaj tę funkcję w najszybszej pamięci RAM, a nie we flashu",
-// dzięki czemu przerwanie wykona się błyskawicznie i nie zawiesi układu.
-void IRAM_ATTR OnLatchRising(){
+// dzięki czemu przerwanie wykona się błyskawicznie i nie zawiesi układu. */
+void IRAM_ATTR OnLatchRising()
+{
     // 1. Zaczynamy z czystą kartą: 0xFF to binarnie 11111111 (wszystkie przyciski puszczone
-    uint8_t currentState=0xFF;
+    uint8_t currentState = 0xFF;
 
-    // 2. Jeśli dany przycisk jest wciśnięty, "zerujemy" odpowiedni bit w naszym bajcie.
-    // Używamy wbudowanej funkcji bitClear(zmienna, numer_bitu)
-    // Kolejność Pegasusa to ZAWSZE: A, B, Select, Start, Up, Down, Left, Right
+    /*     // 2. Jeśli dany przycisk jest wciśnięty, "zerujemy" odpowiedni bit w naszym bajcie.
+        // Używamy wbudowanej funkcji bitClear(zmienna, numer_bitu)
+        // Kolejność Pegasusa to ZAWSZE: A, B, Select, Start, Up, Down, Left, Right */
 
-   if (pad.APressed())      bitClear(currentState, 0); // Bit 0 to przycisk A
-    if (pad.BPressed())      bitClear(currentState, 1); // Bit 1 to B
-    if (pad.SelectPressed()) bitClear(currentState, 2); // Bit 2 to Select
-    if (pad.StartPressed())  bitClear(currentState, 3); // Bit 3 to Start
-    if (pad.UpPressed())     bitClear(currentState, 4); // Bit 4 to Up
-    if (pad.DownPressed())   bitClear(currentState, 5); // Bit 5 to Down
-    if (pad.LeftPressed())   bitClear(currentState, 6); // Bit 6 to Left
-    if (pad.RightPressed())  bitClear(currentState, 7); // Bit 7 to Right
+    if (pad.APressed())
+        bitClear(currentState, 0); // Bit 0 to przycisk A
+    if (pad.BPressed())
+        bitClear(currentState, 1); // Bit 1 to B
+    if (pad.SelectPressed())
+        bitClear(currentState, 2); // Bit 2 to Select
+    if (pad.StartPressed())
+        bitClear(currentState, 3); // Bit 3 to Start
+    if (pad.UpPressed())
+        bitClear(currentState, 4); // Bit 4 to Up
+    if (pad.DownPressed())
+        bitClear(currentState, 5); // Bit 5 to Down
+    if (pad.LeftPressed())
+        bitClear(currentState, 6); // Bit 6 to Left
+    if (pad.RightPressed())
+        bitClear(currentState, 7); // Bit 7 to Right
 
     // 3. Zapisujemy odczytany stan do naszego głównego, globalnego rejestru
     nesRegister = currentState;
 
-// 4. TAJEMNICA SPRZĘTOWA NES-a:
-    // Kiedy LATCH idzie w górę, oryginalny pad natychmiast, bez czekania na ZEGAR,
-    // wystawia na kabel DATA stan pierwszego przycisku (czyli bit 0 - przycisk A).
-    // Musimy to zasymulować! Odczytujemy bit zerowy (bitRead) i wysyłamy na kabel.
+    /* // 4. TAJEMNICA SPRZĘTOWA NES-a:
+        // Kiedy LATCH idzie w górę, oryginalny pad natychmiast, bez czekania na ZEGAR,
+        // wystawia na kabel DATA stan pierwszego przycisku (czyli bit 0 - przycisk A).
+        // Musimy to zasymulować! Odczytujemy bit zerowy (bitRead) i wysyłamy na kabel. */
 
- if (bitRead(nesRegister, 0) == 0) {
-        digitalWrite(PIN_DATA, LOW);  // Jeśli zero (wciśnięty), wyślij LOW
-    } else {
+    if (bitRead(nesRegister, 0) == 0)
+    {
+        digitalWrite(PIN_DATA, LOW); // Jeśli zero (wciśnięty), wyślij LOW
+    }
+    else
+    {
         digitalWrite(PIN_DATA, HIGH); // Jeśli jedynka (puszczony), wyślij HIGH
     }
-    
 
+    bitIndex = 0; // Resetujemy licznik, bo LATCH oznacza początek nowej sekwencji odczytu
+}
+
+void IRAM_ATTR OnClockRising()
+{
+    // Tang Nano uderzył w zegar! Zwiększamy nasz licznik, żeby wziąć kolejny przycisk.
+    bitIndex++;
+    // Zabezpieczenie inżynieryjne: oryginalny pad ma 8 przycisków (bity 0-7).
+    // Jeśli Tang zwariuje i wyśle więcej impulsów zegara, nie chcemy wyjść poza pamięć.
+    if (bitIndex > 7)
+        bitIndex = 7;
+    // Odczytujemy kolejny bit z naszego zamrożonego rejestru i wystawiamy na kabel
+    if (bitRead(nesRegister, bitIndex) == 0)
+        digitalWrite(PIN_DATA, LOW); 
+    else
+        digitalWrite(PIN_DATA, HIGH);
 }
 
 void setup()
@@ -64,21 +93,20 @@ void setup()
     Serial.begin(115200);
     Wire.begin(20, 21);
 
-// Konfiguracja kierunków (kto słucha, a kto nadaje)
-    pinMode(PIN_CLOCK, INPUT);  // ESP słucha zegara
-    pinMode(PIN_LATCH, INPUT);  // ESP słucha zatrzasku
-    pinMode(PIN_DATA, OUTPUT);  // ESP nadaje dane
-    
+    // Konfiguracja kierunków (kto słucha, a kto nadaje)
+    pinMode(PIN_CLOCK, INPUT); // ESP słucha zegara
+    pinMode(PIN_LATCH, INPUT); // ESP słucha zatrzasku
+    pinMode(PIN_DATA, OUTPUT); // ESP nadaje dane
+
     // Na start ustawiamy na linii Danych stan wysoki (puszczony przycisk)
     digitalWrite(PIN_DATA, HIGH);
 
-// Podpinamy naszą funkcję onLatchRising pod żółty kabel.
-    // RISING oznacza, że funkcja odpali się dokładnie w tym ułamku mikrosekundy,
-    // gdy napięcie na kablu skoczy z 0V na 3.3V.
-
-   attachInterrupt(digitalPinToInterrupt(PIN_LATCH), OnLatchRising, RISING);
-    
-
+    /* // Podpinamy naszą funkcję onLatchRising pod żółty kabel.
+        // RISING oznacza, że funkcja odpali się dokładnie w tym ułamku mikrosekundy,
+        // gdy napięcie na kablu skoczy z 0V na 3.3V. */
+    attachInterrupt(digitalPinToInterrupt(PIN_LATCH), OnLatchRising, RISING);
+    // Podpinamy funkcję zegara pod pomarańczowy kabel
+    attachInterrupt(digitalPinToInterrupt(PIN_CLOCK), OnClockRising, RISING);
 
     renderer.Setup();
 
@@ -102,7 +130,7 @@ void setup()
 #endif
 
     Serial.println("System GOTOWY!");
-    text.ShowText("System GOTOWY!",0, 20, false);
+    text.ShowText("System GOTOWY!", 0, 20, false);
     renderer.Display();
     delay(1000);
 }
@@ -148,6 +176,22 @@ void loop()
         {
             text.ShowText("Wcisnieto: PRAWO", 0, 16, false);
         }
+        if (pad.APressed())
+        {
+            text.ShowText("Wcisnieto: A", 0, 16, false);
+        }
+        if (pad.BPressed())
+        {
+            text.ShowText("Wcisnieto: B", 0, 16, false);
+        }
+        if (pad.XPressed())
+        {
+            text.ShowText("Wcisnieto: X", 0, 16, false);
+        }
+        if (pad.YPressed())
+        {
+            text.ShowText("Wcisnieto: Y", 0, 16, false);
+        }
         if (pad.StartPressed())
         {
             text.ShowText("Wcisnieto: START", 0, 16, false);
@@ -155,6 +199,14 @@ void loop()
         if (pad.SelectPressed())
         {
             text.ShowText("Wcisnieto: SELECT", 0, 16, false);
+        }
+        if (pad.SharePressed())
+        {
+            text.ShowText("Wcisnieto: SHARE", 0, 16, false);
+        }
+        if (pad.XBoxPressed())
+        {
+            text.ShowText("Wcisnieto: XBOX", 0, 16, false);
         }
     }
     else
