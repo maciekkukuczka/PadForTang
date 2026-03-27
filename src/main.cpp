@@ -22,6 +22,43 @@ const int PIN_DATA  = 5;  // Ciemnozielony kabel - Dane (do Tanga)
 // w starych konsolach "1" = puszczony, "0" = wciśnięty.
 volatile uint8_t nesRegister = 0xFF;
 
+// Słówko IRAM_ATTR jest KRYTYCZNE na ESP32!
+// Mówi procesorowi: "Trzymaj tę funkcję w najszybszej pamięci RAM, a nie we flashu",
+// dzięki czemu przerwanie wykona się błyskawicznie i nie zawiesi układu.
+void IRAM_ATTR OnLatchRising(){
+    // 1. Zaczynamy z czystą kartą: 0xFF to binarnie 11111111 (wszystkie przyciski puszczone
+    uint8_t currentState=0xFF;
+
+    // 2. Jeśli dany przycisk jest wciśnięty, "zerujemy" odpowiedni bit w naszym bajcie.
+    // Używamy wbudowanej funkcji bitClear(zmienna, numer_bitu)
+    // Kolejność Pegasusa to ZAWSZE: A, B, Select, Start, Up, Down, Left, Right
+
+   if (pad.APressed())      bitClear(currentState, 0); // Bit 0 to przycisk A
+    if (pad.BPressed())      bitClear(currentState, 1); // Bit 1 to B
+    if (pad.SelectPressed()) bitClear(currentState, 2); // Bit 2 to Select
+    if (pad.StartPressed())  bitClear(currentState, 3); // Bit 3 to Start
+    if (pad.UpPressed())     bitClear(currentState, 4); // Bit 4 to Up
+    if (pad.DownPressed())   bitClear(currentState, 5); // Bit 5 to Down
+    if (pad.LeftPressed())   bitClear(currentState, 6); // Bit 6 to Left
+    if (pad.RightPressed())  bitClear(currentState, 7); // Bit 7 to Right
+
+    // 3. Zapisujemy odczytany stan do naszego głównego, globalnego rejestru
+    nesRegister = currentState;
+
+// 4. TAJEMNICA SPRZĘTOWA NES-a:
+    // Kiedy LATCH idzie w górę, oryginalny pad natychmiast, bez czekania na ZEGAR,
+    // wystawia na kabel DATA stan pierwszego przycisku (czyli bit 0 - przycisk A).
+    // Musimy to zasymulować! Odczytujemy bit zerowy (bitRead) i wysyłamy na kabel.
+
+ if (bitRead(nesRegister, 0) == 0) {
+        digitalWrite(PIN_DATA, LOW);  // Jeśli zero (wciśnięty), wyślij LOW
+    } else {
+        digitalWrite(PIN_DATA, HIGH); // Jeśli jedynka (puszczony), wyślij HIGH
+    }
+    
+
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -35,7 +72,12 @@ void setup()
     // Na start ustawiamy na linii Danych stan wysoki (puszczony przycisk)
     digitalWrite(PIN_DATA, HIGH);
 
+// Podpinamy naszą funkcję onLatchRising pod żółty kabel.
+    // RISING oznacza, że funkcja odpali się dokładnie w tym ułamku mikrosekundy,
+    // gdy napięcie na kablu skoczy z 0V na 3.3V.
 
+   attachInterrupt(digitalPinToInterrupt(PIN_LATCH), OnLatchRising, RISING);
+    
 
 
     renderer.Setup();
