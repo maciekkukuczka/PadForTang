@@ -5,7 +5,6 @@
 class Text
 {
 private:
-    /* data */
     Renderer& renderer;
     public:
     Text(Renderer&);

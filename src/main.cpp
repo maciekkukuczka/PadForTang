@@ -10,10 +10,33 @@ Pad pad;
 Renderer renderer;
 Text text(renderer);
 
+// --- PINY KOMUNIKACYJNE TANG NANO ---
+const int PIN_CLOCK = 3;  // Pomarańczowy kabel - Zegar (od Tanga)
+const int PIN_LATCH = 4;  // Żółty kabel - Zatrzask (od Tanga)
+const int PIN_DATA  = 5;  // Ciemnozielony kabel - Dane (do Tanga)
+
+// --- NASZ WIRTUALNY REJESTR (Pamięć pada) ---
+// uint8_t to specjalna zmienna, która ma dokładnie 8 bitów (8 miejsc na zera lub jedynki).
+// Idealnie pasuje do 8 przycisków klasycznego pada!
+// Wpisujemy na start 0xFF (same jedynki: 11111111), bo przypominam: 
+// w starych konsolach "1" = puszczony, "0" = wciśnięty.
+volatile uint8_t nesRegister = 0xFF;
+
 void setup()
 {
     Serial.begin(115200);
     Wire.begin(20, 21);
+
+// Konfiguracja kierunków (kto słucha, a kto nadaje)
+    pinMode(PIN_CLOCK, INPUT);  // ESP słucha zegara
+    pinMode(PIN_LATCH, INPUT);  // ESP słucha zatrzasku
+    pinMode(PIN_DATA, OUTPUT);  // ESP nadaje dane
+    
+    // Na start ustawiamy na linii Danych stan wysoki (puszczony przycisk)
+    digitalWrite(PIN_DATA, HIGH);
+
+
+
 
     renderer.Setup();
 

@@ -12,8 +12,6 @@ void Text::ShowText(String text, int x, int y, bool clearDisplay)
     
     renderer.display.setCursor(x,y);
     renderer.display.println(text);
-    // renderer.display.display();
-
 
 }
 

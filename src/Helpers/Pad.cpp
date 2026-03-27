@@ -41,6 +41,48 @@ bool Pad::RightPressed()
     return false;
 }
 
+bool Pad::APressed()
+{
+    if (xboxController.xboxNotif.btnA)return true;
+    return false;
+}
+bool Pad::BPressed()
+{
+    if (xboxController.xboxNotif.btnB)return true;
+    return false;
+}
+bool Pad::XPressed()
+{
+    if (xboxController.xboxNotif.btnX)return true;
+    return false;
+}
+bool Pad::YPressed()
+{
+    if (xboxController.xboxNotif.btnY)return true;
+    return false;
+}
+
+
+bool Pad::L1Pressed()
+{
+    if (xboxController.xboxNotif.btnLB)return true;
+    return false;
+}
+bool Pad::L2Pressed()
+{
+    if (xboxController.xboxNotif.trigLT)return true;
+    return false;
+}
+bool Pad::R1Pressed()
+{
+    if (xboxController.xboxNotif.btnRB)return true;
+    return false;
+}
+bool Pad::R2Pressed()
+{
+    if (xboxController.xboxNotif.trigRT)return true;
+    return false;
+}
 
 bool Pad::StartPressed()
 {
@@ -48,9 +90,21 @@ bool Pad::StartPressed()
     return false;
 }
 
+
 bool Pad::SelectPressed()
 {
     if (xboxController.xboxNotif.btnSelect) return true;
+    return false;
+}
+bool Pad::SharePressed()
+{
+    if (xboxController.xboxNotif.btnShare) return true;
+    return false;
+}
+
+bool Pad::XBoxPressed()
+{
+    if (xboxController.xboxNotif.btnXbox) return true;
     return false;
 }
 
