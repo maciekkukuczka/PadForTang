@@ -14,16 +14,19 @@ VirtualNesPad nesPadPlayer1(pad, 3, 4, 5); // 1P
 #endif
 Renderer renderer;
 Text text(renderer);
+volatile int pulseCount = 0;
+bool isSnes = false;
+volatile bool isAfterFirstCourse=false;
 
 // --- FUNKCJE POŚREDNICZĄCE DLA PRZERWAŃ ---
 // To one są podpinane pod piny, a same tylko "przekazują piłkę" do klasy.
 
 // 1P
-void IRAM_ATTR latchWrapper1()
+void IRAM_ATTR nesLatchWrapper1()
 {
     nesPadPlayer1.OnLatchRising();
 }
-void IRAM_ATTR clockWrapper1()
+void IRAM_ATTR nesClockWrapper1()
 {
     nesPadPlayer1.OnClockRising();
 }
@@ -34,6 +37,34 @@ void IRAM_ATTR clockWrapper1()
 void IRAM_ATTR clockWrapper2(){
     nesPadPlayer2.OnClockRising();
 } */
+
+void IRAM_ATTR OnLatch()
+{
+    
+    if (isAfterFirstCourse &&pulseCount  < 7)
+    {
+        nesClockWrapper1();
+        isSnes = false;
+        detachInterrupt(3);
+        detachInterrupt(4);
+        attachInterrupt(digitalPinToInterrupt(nesPadPlayer1.PIN_LATCH), nesLatchWrapper1, RISING);
+        attachInterrupt(digitalPinToInterrupt(nesPadPlayer1.PIN_CLOCK), nesClockWrapper1, RISING);
+    }
+    else
+    {
+        isSnes = true;
+
+        // Tutaj obsługa snesa
+    }
+
+    pulseCount = 0;
+    isAfterFirstCourse=true;
+
+}
+void IRAM_ATTR OnClock()
+{
+    ++pulseCount;
+}
 
 void setup()
 {
@@ -62,10 +93,13 @@ void setup()
     // Podpinamy naszą funkcję onLatchRising pod żółty kabel.
     // RISING oznacza, że funkcja odpali się dokładnie w tym ułamku mikrosekundy,
     // gdy napięcie na kablu skoczy z 0V na 3.3V.
+
+    attachInterrupt(digitalPinToInterrupt(4), OnLatch, RISING);
+    attachInterrupt(digitalPinToInterrupt(3), OnClock, RISING);
     // 1P
-    attachInterrupt(digitalPinToInterrupt(nesPadPlayer1.PIN_LATCH), latchWrapper1, RISING);
+    // attachInterrupt(digitalPinToInterrupt(nesPadPlayer1.PIN_LATCH), nesLatchWrapper1, RISING);
     // Podpinamy funkcję zegara pod pomarańczowy kabel
-    attachInterrupt(digitalPinToInterrupt(nesPadPlayer1.PIN_CLOCK), clockWrapper1, RISING);
+    // attachInterrupt(digitalPinToInterrupt(nesPadPlayer1.PIN_CLOCK), nesClockWrapper1, RISING);
     // 2P
     /*  attachInterrupt(digitalPinToInterrupt(nesPadPlayer2.PIN_LATCH), latchWrapper2, RISING);
      attachInterrupt(digitalPinToInterrupt(nesPadPlayer2.PIN_CLOCK), clockWrapper2, RISING); */
@@ -102,7 +136,7 @@ void loop()
 
 #if USE_XBOX_PAD
     pad.ControllerUpdate();
-    nesPadPlayer1.UpdateState(); //1P
+    nesPadPlayer1.UpdateState(); // 1P
     // nesPadPlayer2.UpdateState(); //2P
 
     if (pad.Connected() && lastConnected == false)
