@@ -4,6 +4,7 @@
 #include "Renderer.h"
 #include "Text.h"
 #include "VirtualNesPad.h"
+#include "VirtualSnesPad.h"
 #if USE_XBOX_PAD
 #include "Pad.h"
 Pad pad;
@@ -11,12 +12,14 @@ bool lastConnected = false;
 
 VirtualNesPad nesPadPlayer1(pad, 3, 4, 5); // 1P
 // VirtualNesPad nesPadPlayer2(pad,14,15,18); //2P
+VirtualSnesPad snesPadPlayer1(pad, 3, 4, 5); // 1P
+// VirtualNesPad nesPadPlayer2(pad,14,15,18); //2P
 #endif
 Renderer renderer;
 Text text(renderer);
-volatile int pulseCount = 0;
-bool isSnes = false;
-volatile bool isAfterFirstCourse=false;
+volatile int pulseCount = 0; // volatile - nie optymalizuj! zawsze odczytaj z ram
+volatile bool isSnes = false;
+volatile bool isAfterFirstCourse = false;
 
 // --- FUNKCJE POŚREDNICZĄCE DLA PRZERWAŃ ---
 // To one są podpinane pod piny, a same tylko "przekazują piłkę" do klasy.
@@ -38,28 +41,43 @@ void IRAM_ATTR clockWrapper2(){
     nesPadPlayer2.OnClockRising();
 } */
 
+void IRAM_ATTR snesLatchWrapper1()
+{
+    snesPadPlayer1.OnLatchRising();
+}
+
+void IRAM_ATTR snesClockWrapper1()
+{
+    snesPadPlayer1.OnClockRising();
+}
+
 void IRAM_ATTR OnLatch()
 {
-    
-    if (isAfterFirstCourse &&pulseCount  < 7)
+    if (isAfterFirstCourse)
     {
-        nesClockWrapper1();
-        isSnes = false;
-        detachInterrupt(3);
-        detachInterrupt(4);
-        attachInterrupt(digitalPinToInterrupt(nesPadPlayer1.PIN_LATCH), nesLatchWrapper1, RISING);
-        attachInterrupt(digitalPinToInterrupt(nesPadPlayer1.PIN_CLOCK), nesClockWrapper1, RISING);
+
+        if (pulseCount < 7)
+        {
+            // nesClockWrapper1();
+            isSnes = false;
+            detachInterrupt(3);
+            detachInterrupt(4);
+            attachInterrupt(digitalPinToInterrupt(nesPadPlayer1.PIN_LATCH), nesLatchWrapper1, RISING);
+            attachInterrupt(digitalPinToInterrupt(nesPadPlayer1.PIN_CLOCK), nesClockWrapper1, RISING);
+        }
+        else
+        {
+            // snesClockWrapper1();
+            isSnes = true;
+            detachInterrupt(3);
+            detachInterrupt(4);
+            attachInterrupt(digitalPinToInterrupt(snesPadPlayer1.PIN_LATCH), snesLatchWrapper1, RISING);
+            attachInterrupt(digitalPinToInterrupt(snesPadPlayer1.PIN_CLOCK), snesClockWrapper1, RISING);
+        }
+        pulseCount = 0;
     }
-    else
-    {
-        isSnes = true;
 
-        // Tutaj obsługa snesa
-    }
-
-    pulseCount = 0;
-    isAfterFirstCourse=true;
-
+    isAfterFirstCourse = true;
 }
 void IRAM_ATTR OnClock()
 {
@@ -136,8 +154,16 @@ void loop()
 
 #if USE_XBOX_PAD
     pad.ControllerUpdate();
-    nesPadPlayer1.UpdateState(); // 1P
-    // nesPadPlayer2.UpdateState(); //2P
+
+    if (!isSnes)
+    {
+        nesPadPlayer1.UpdateState(); // 1P
+        // nesPadPlayer2.UpdateState(); //2P
+    }
+    else
+    {
+        snesPadPlayer1.UpdateState();
+    }
 
     if (pad.Connected() && lastConnected == false)
     {
