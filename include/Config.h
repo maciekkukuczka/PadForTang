@@ -4,3 +4,5 @@
 // Screen
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 32
+
+#define MAC_ADDRESS_BASE "ac:eb:e6:1a:75:90"
